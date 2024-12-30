@@ -1,91 +1,75 @@
-name: CI/CD with Poetry (Optimized Parallel Jobs)
+name: Python CI/CD Pipeline
 
-on:
+on: 
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+    branches:
+      - main
 
 jobs:
   build:
+    name: Build dependencies
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./example-app
-
     steps:
-      - name: 🛠️ Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v3
         with:
-          python-version: '3.11'
+          python-version: '3.x'
 
-      - name: 📦 Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.8.5
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+      - name: Install Poetry
+        run: pip install poetry
 
-      - name: 🗂️ Cache build venv
+      - name: Cache dependencies
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/work/example-app/example-app/.venv
+          path: /home/runner/work/example-app/.venv
           key: ${{ runner.os }}-venv-${{ hashFiles('**/poetry.lock') }}
 
-      - name: 📥 Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-root
+      - name: Install dependencies
+        run: poetry install
 
-  static-analysis:
+  lint:
+    name: Linting & Security
     runs-on: ubuntu-latest
     needs: build
-    defaults:
-      run:
-        working-directory: ./example-app
-
     steps:
-      - name: 🛠️ Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: 🗂️ Restore cached dependencies
+      - name: Restore dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/work/example-app/example-app/.venv
+          path: /home/runner/work/example-app/.venv
           key: ${{ runner.os }}-venv-${{ hashFiles('**/poetry.lock') }}
 
-      - name: 🛡️ Run lint
-        run: poetry run task lint
+      - name: Run linter
+        run: poetry run flake8
 
-      - name: 🎨 Run formatter
-        run: poetry run task formatter
+      - name: Run formatter
+        run: poetry run black --check .
 
-      - name: 🔒 Run security checks
-        run: poetry run task security
+      - name: Run security checks
+        run: poetry run bandit -r .
 
   unittest:
+    name: Unit Tests
     runs-on: ubuntu-latest
     needs: build
-    defaults:
-      run:
-        working-directory: ./example-app
-
     steps:
-      - name: 🛠️ Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: 🗂️ Restore cached dependencies
+      - name: Restore dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/work/example-app/example-app/.venv
+          path: /home/runner/work/example-app/.venv
           key: ${{ runner.os }}-venv-${{ hashFiles('**/poetry.lock') }}
 
-      - name: 🧪 Run unit tests
-        run: poetry run task test
+      - name: Run unit tests
+        run: poetry run pytest
