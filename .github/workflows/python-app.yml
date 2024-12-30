@@ -1,82 +1,93 @@
+name: python-app  # Nazwa workflow
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
 jobs:
-  build:
-    name: Build dependencies
+  build-deps:
     runs-on: ubuntu-latest
+    concurrency:
+      group: build-deps-group
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v3
+      # Tu ustawiasz cache
+      - name: Cache build venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
         with:
-          python-version: '3.x'
+          path: /home/runner/work/iac-labs2/example-app/.venv
+          key: ${{ runner.os }}-venv
 
       - name: Install Poetry
         run: |
-          pip install poetry
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH  # dodajemy Poetry do PATH
+
+      - name: Install dependencies
+        run: |
+          poetry install
+
+  static-tests:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: static-tests-group
+    needs: build-deps
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      # Tak samo cache (może być ten sam "key", by przyspieszyć)
+      - name: Cache build venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/work/iac-labs2/example-app/.venv
+          key: ${{ runner.os }}-venv
+
+      - name: Use Poetry
+        run: |
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Odpalenie lintera, formattera, security (przykład)
+      - name: Lint
+        run: |
+          poetry run flake8 .
+
+      - name: Formatter
+        run: |
+          poetry run black --check .
+
+      - name: Security
+        run: |
+          poetry run bandit -r .
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: unit-tests-group
+    # Jesli chcesz, zeby testy jednostkowe startowaly dopiero po static-tests:
+    needs: [build-deps, static-tests]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
 
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/work/${{ github.event.repository.name }}/example-app/.venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('example-app/poetry.lock') }}
+          path: /home/runner/work/iac-labs2/example-app/.venv
+          key: ${{ runner.os }}-venv
 
-      - name: Install dependencies
-        working-directory: ./example-app
-        run: poetry install
-
-  lint:
-    name: Linting & Security
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Restore dependencies
-        uses: actions/cache@v3
-        with:
-          path: /home/runner/work/${{ github.event.repository.name }}/example-app/.venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('example-app/poetry.lock') }}
-
-      - name: Activate virtual environment
-        working-directory: ./example-app
+      - name: Use Poetry
         run: |
-          source $(poetry env info --path)/bin/activate
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Run linter
-        working-directory: ./example-app
-        run: poetry run pylint apps
-
-      - name: Run formatter
-        working-directory: ./example-app
-        run: poetry run black --check apps
-
-      - name: Run security checks
-        working-directory: ./example-app
-        run: poetry run bandit -r apps
-
-  unittest:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Restore dependencies
-        uses: actions/cache@v3
-        with:
-          path: /home/runner/work/${{ github.event.repository.name }}/example-app/.venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('example-app/poetry.lock') }}
-
-      - name: Activate virtual environment
-        working-directory: ./example-app
+      # Testy jednostkowe
+      - name: Run tests
         run: |
-          source $(poetry env info --path)/bin/activate
-
-      - name: Run unit tests
-        working-directory: ./example-app
-        run: poetry run pytest tests/
+          poetry run pytest --verbose
