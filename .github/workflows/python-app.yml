@@ -1,4 +1,4 @@
-name: python-app  # nazwa workflow
+name: python-app
 
 on:
   push:
@@ -7,103 +7,105 @@ on:
     branches: [ "main" ]
 
 jobs:
-
-  build-deps:
+  build:
     runs-on: ubuntu-latest
     concurrency:
-      group: build-deps-group
+      group: build-group
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
 
-      # Krok diagnostyczny (opcjonalnie) - zobaczysz strukturę plików w logach
+      # (opcjonalnie) Wylistuj pliki w logach, by upewnić się co do struktury
       - name: List files
         run: |
           pwd
           ls -R
 
+      # Cache wirtualnego środowiska
       - name: Cache build venv
-        id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          # Ścieżka do folderu z .venv -> w tym przykładzie "example-app/.venv"
+          path: example-app/.venv
+          key: ${{ runner.os }}-venv
+
+      # Instalacja Poetry
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Konfiguracja, by .venv był w folderze projektu
+      - name: Configure Poetry
+        working-directory: example-app
+        run: |
+          poetry config virtualenvs.in-project true
+
+      # Instalacja zależności
+      - name: Install dependencies
+        working-directory: example-app
+        run: |
+          poetry install
+
+  lint:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: lint-group
+    needs: build  # job zostanie uruchomiony PO zakończeniu 'build'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Cache build venv
+        uses: actions/cache@v3
+        with:
+          path: example-app/.venv
+          key: ${{ runner.os }}-venv
+
+      # Musimy zainstalować Poetry w tym jobie, bo każde zadanie startuje w świeżym środowisku
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Lint
+      - name: lint
+        working-directory: example-app
+        run: |
+          poetry run flake8 .
+
+      # Formatter
+      - name: formatter
+        working-directory: example-app
+        run: |
+          poetry run black --check .
+
+      # Security
+      - name: security
+        working-directory: example-app
+        run: |
+          poetry run bandit -r .
+
+  unittests:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: unittests-group
+    needs: lint  # czekaj na lint, który zawiera też formatter/security
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Cache build venv
+        uses: actions/cache@v3
+        with:
           path: example-app/.venv
           key: ${{ runner.os }}-venv
 
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          # Dodajemy Poetry do PATH
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Configure Poetry to create venv in the project folder
-        working-directory: example-app
-        run: |
-          poetry config virtualenvs.in-project true
-
-      - name: Install dependencies
-        working-directory: example-app
-        run: |
-          poetry install
-
-  static-tests:
-    runs-on: ubuntu-latest
-    concurrency:
-      group: static-tests-group
-    needs: build-deps  # job uruchomi się po zakończeniu build-deps
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
-      - name: Cache build venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v3
-        with:
-          path: example-app/.venv
-          key: ${{ runner.os }}-venv
-
-      - name: Add Poetry to PATH
-        run: |
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Lint
-        working-directory: example-app
-        run: |
-          poetry run flake8 .
-
-      - name: Formatter
-        working-directory: example-app
-        run: |
-          poetry run black --check .
-
-      - name: Security
-        working-directory: example-app
-        run: |
-          poetry run bandit -r .
-
-  unit-tests:
-    runs-on: ubuntu-latest
-    concurrency:
-      group: unit-tests-group
-    needs: 
-      - build-deps
-      - static-tests  # Jeśli chcesz, by testy jednostkowe czekały na static-tests
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
-      - name: Cache build venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v3
-        with:
-          path: example-app/.venv
-          key: ${{ runner.os }}-venv
-
-      - name: Add Poetry to PATH
-        run: |
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Tests
+      - name: Run Unit Tests
         working-directory: example-app
         run: |
           poetry run pytest --verbose
