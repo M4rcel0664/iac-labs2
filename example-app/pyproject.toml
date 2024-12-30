@@ -37,15 +37,16 @@ pytest = "^8.3.3"
 isort = "^5.13.2"
 flake8 = "^7.1.1"
 bandit = "^1.7.10"
+taskipy = "*"
+
 
 [tool.pylint.'MESSAGES CONTROL']
 max-line-length = 120
 disable = "C0116, C0115, R0903"
 
 [tool.taskipy.tasks]
-lint = "pylint apps"
-formatter = "black --check apps"
-security = "bandit -r apps"
-test = "pytest tests/"
-server = "poetry run python run.py"
-local = "export DEBUG=True && poetry run python run.py"
+formatter = "black --check ."
+lint = "flake8 ."
+security = "safety check"
+test = "pytest"
+
