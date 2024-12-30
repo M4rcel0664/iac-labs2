@@ -5,7 +5,8 @@ description = "Example app for IaC learning purposes"
 authors = ["mwidera <28962708+mwidera@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "example_app"}]
+packages = [{include = "apps"}]  # Zmiana ścieżki na poprawną
+
 
 [build-system]
 requires = ["setuptools", "poetry-core>=1.0"]
