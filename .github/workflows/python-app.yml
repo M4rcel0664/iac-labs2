@@ -1,170 +1,139 @@
-name: Python application
+name: Python app
 
 on:
   push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: ./example-app
+    shell: bash
+
 jobs:
   build:
-    runs-on: ubuntu-latest
-    concurrency:
-      group: python-build-group
-    defaults:
-      run:
-        working-directory: ./example-app
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
+    steps:
+      - uses: actions/checkout@v4
       - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
           python-version: "3.11"
-      
-      # Instalacja Poetry za pomocą akcji snok/install-poetry
       - name: Install Poetry Action
         uses: snok/install-poetry@v1.3.4
-        # Możesz ustawić konkretną wersję: 
-        # with:
-        #   version: "1.4.2"
-
-      # Cache wirtualnego środowiska (jeśli Poetry tworzy je w .cache/pypoetry)
+      - name: Install dependecies with poetry
+        run: poetry install --no-root
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/.cache/pypoetry/virtualenvs
+          path: /home/runner/work/iac-labs2/iac-labs2/example-app/.venv
           key: ${{ runner.os }}-venv
-
-      - name: Install dependencies
-        run: |
-          # --no-root oznacza: instaluj zależności bez instalowania tego projektu jako paczki
-          poetry install --no-root
-          # Jeżeli wolisz, możesz pominąć --no-root
-          # poetry install
 
   lint:
-    # Zakładam, że musi się wykonać po 'build', 
-    # bo tam instalujemy dependencies
-    needs: build
     runs-on: ubuntu-latest
-    concurrency:
-      group: python-build-group
+    needs: build
     defaults:
       run:
         working-directory: ./example-app
+        shell: bash
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
       - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
           python-version: "3.11"
-
       - name: Install Poetry Action
         uses: snok/install-poetry@v1.3.4
-
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/.cache/pypoetry/virtualenvs
+          path: /home/runner/work/iac-labs2/iac-labs2/example-app/.venv
           key: ${{ runner.os }}-venv
-
-      - name: Run lint
+      - name: lint
         run: poetry run task lint
 
   formatter:
-    needs: build
     runs-on: ubuntu-latest
-    concurrency:
-      group: python-build-group
+    needs: build
     defaults:
       run:
         working-directory: ./example-app
+        shell: bash
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
       - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
           python-version: "3.11"
-
       - name: Install Poetry Action
         uses: snok/install-poetry@v1.3.4
-
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/.cache/pypoetry/virtualenvs
+          path: /home/runner/work/iac-labs2/iac-labs2/example-app/.venv
           key: ${{ runner.os }}-venv
-
-      - name: Run formatter
+      - name: formatter
         run: poetry run task formatter
 
   security:
-    needs: build
     runs-on: ubuntu-latest
-    concurrency:
-      group: python-build-group
+    needs: build
     defaults:
       run:
         working-directory: ./example-app
+        shell: bash
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
       - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
           python-version: "3.11"
-
       - name: Install Poetry Action
         uses: snok/install-poetry@v1.3.4
-
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/.cache/pypoetry/virtualenvs
+          path: /home/runner/work/iac-labs2/iac-labs2/example-app/.venv
           key: ${{ runner.os }}-venv
-
-      - name: Run security
+      - name: security
         run: poetry run task security
 
   unittests:
-    # Potrzebujemy, aby lint/formatter/security zakończyły się sukcesem 
-    # zanim uruchomimy testy jednostkowe.
-    needs: [lint, formatter, security]
     runs-on: ubuntu-latest
-    concurrency:
-      group: python-build-group
+    needs: [lint, formatter, security]
     defaults:
       run:
         working-directory: ./example-app
+        shell: bash
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
       - name: Set up Python 3.11
         uses: actions/setup-python@v3
         with:
           python-version: "3.11"
-
       - name: Install Poetry Action
         uses: snok/install-poetry@v1.3.4
-
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/.cache/pypoetry/virtualenvs
+          path: /home/runner/work/iac-labs2/iac-labs2/example-app/.venv
           key: ${{ runner.os }}-venv
-
       - name: Run unit tests
         run: poetry run task test
