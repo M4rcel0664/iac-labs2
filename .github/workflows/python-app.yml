@@ -29,7 +29,6 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH  # dodajemy Poetry do PATH
 
       - name: Install dependencies
-        working-directory: iac-labs2
         run: |
           poetry install
 
