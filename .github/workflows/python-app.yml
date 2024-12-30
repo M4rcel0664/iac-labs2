@@ -1,111 +1,140 @@
-name: python-app
+name: Python CI
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Grupa concurrency (opcjonalna; jeśli jej używamy, 
+    # to w pozostałych jobach także dajemy concurrency z tym samym group)
     concurrency:
-      group: build-group
+      group: python-build-group
+    runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
 
-      # (opcjonalnie) Wylistuj pliki w logach, by upewnić się co do struktury
-      - name: List files
-        run: |
-          pwd
-          ls -R
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
 
-      # Cache wirtualnego środowiska
+      # Krok z cache. W 'path' ustaw ścieżkę do .venv 
+      # (zależy od tego, gdzie je tworzysz).
       - name: Cache build venv
+        id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: example-app/.venv
+          path: /home/runner/work/iac-labs2/iac-labs2/.venv  # <-- dostosuj do własnej ścieżki
           key: ${{ runner.os }}-venv
 
-      # Instalacja Poetry
       - name: Install Poetry
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      # Konfiguracja, by .venv był w folderze projektu
-      - name: Configure Poetry
-        working-directory: example-app
-        run: |
-          poetry config virtualenvs.in-project true
-
-      # Instalacja zależności
+          pip install poetry
       - name: Install dependencies
-        working-directory: example-app
         run: |
           poetry install
 
   lint:
-    runs-on: ubuntu-latest
+    # Mówimy, że lint potrzebuje joba "build",
+    # więc startuje dopiero, gdy build się zakończy sukcesem
+    needs: build
     concurrency:
-      group: lint-group
-    needs: build  # job zostanie uruchomiony PO zakończeniu 'build'
+      group: python-build-group
+    runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
       - name: Cache build venv
+        id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: example-app/.venv
+          path: /home/runner/work/iac-labs2/iac-labs2/.venv
           key: ${{ runner.os }}-venv
 
-      # Musimy zainstalować Poetry w tym jobie, bo każde zadanie startuje w świeżym środowisku
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      # Lint
-      - name: lint
-        working-directory: example-app
+      - name: Run linter
         run: |
           poetry run flake8 .
 
-      # Formatter
-      - name: formatter
-        working-directory: example-app
+  formatter:
+    # Również potrzebuje 'build', startuje równolegle z lint i security
+    needs: build
+    concurrency:
+      group: python-build-group
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cache build venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/work/iac-labs2/iac-labs2/.venv
+          key: ${{ runner.os }}-venv
+
+      - name: Run formatter
         run: |
           poetry run black --check .
 
-      # Security
-      - name: security
-        working-directory: example-app
+  security:
+    needs: build
+    concurrency:
+      group: python-build-group
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cache build venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/work/iac-labs2/iac-labs2/.venv
+          key: ${{ runner.os }}-venv
+
+      - name: Security check
         run: |
-          poetry run bandit -r .
+          poetry run safety check
 
   unittests:
-    runs-on: ubuntu-latest
+    # Potrzebują lint, formatter i security 
+    # – uruchomi się dopiero, gdy wszystkie trzy zakończą się sukcesem
+    needs: [lint, formatter, security]
     concurrency:
-      group: unittests-group
-    needs: lint  # czekaj na lint, który zawiera też formatter/security
+      group: python-build-group
+    runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
       - name: Cache build venv
+        id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: example-app/.venv
+          path: /home/runner/work/iac-labs2/iac-labs2/.venv
           key: ${{ runner.os }}-venv
 
-      - name: Install Poetry
+      - name: Run unit tests
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          poetry run pytest --cov=.
 
-      - name: Run Unit Tests
-        working-directory: example-app
-        run: |
-          poetry run pytest --verbose
