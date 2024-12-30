@@ -33,9 +33,10 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /home/runner/work/${{ github.event.repository.name }}/example-app/.venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('**/poetry.lock') }}
+          key: ${{ runner.os }}-venv-${{ hashFiles('example-app/poetry.lock') }}
 
       - name: Install dependencies
+        working-directory: ./example-app
         run: poetry install
 
   lint:
@@ -50,16 +51,19 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /home/runner/work/${{ github.event.repository.name }}/example-app/.venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('**/poetry.lock') }}
+          key: ${{ runner.os }}-venv-${{ hashFiles('example-app/poetry.lock') }}
 
       - name: Run linter
-        run: poetry run flake8
+        working-directory: ./example-app
+        run: poetry run pylint example_app
 
       - name: Run formatter
-        run: poetry run black --check .
+        working-directory: ./example-app
+        run: poetry run black --check example_app
 
       - name: Run security checks
-        run: poetry run bandit -r .
+        working-directory: ./example-app
+        run: poetry run bandit -r example_app
 
   unittest:
     name: Unit Tests
@@ -73,7 +77,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /home/runner/work/${{ github.event.repository.name }}/example-app/.venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('**/poetry.lock') }}
+          key: ${{ runner.os }}-venv-${{ hashFiles('example-app/poetry.lock') }}
 
       - name: Run unit tests
-        run: poetry run pytest
+        working-directory: ./example-app
+        run: poetry run pytest tests/
