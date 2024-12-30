@@ -33,7 +33,7 @@ jobs:
           pip install poetry
       - name: Install dependencies
         run: |
-          poetry install
+          poetry install --directory example-app
 
   lint:
     # Mówimy, że lint potrzebuje joba "build",
