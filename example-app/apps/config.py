@@ -30,12 +30,12 @@ class ProductionConfig(Config):
 
     # PostgreSQL database
     SQLALCHEMY_DATABASE_URI = (
-        f"{os.getenv('DB_ENGINE', 'postgresql')}://"
-        f"{os.getenv('DB_USERNAME', 'appseed_db_usr')}:"
-        f"{os.getenv('DB_PASS', 'pass')}@"
-        f"{os.getenv('DB_HOST', 'localhost')}:"
-        f"{os.getenv('DB_PORT', '3306')}/"
-        f"{os.getenv('DB_NAME', 'appseed_db')}"
+    f"{os.getenv('DB_ENGINE', 'postgresql')}://"
+    f"{os.getenv('DB_USERNAME', 'zadanie6_postgresql_user')}:" 
+    f"{os.getenv('DB_PASS', 'wXSegk09LgmsFO8RGMhajbFBQ88D2XaL')}@"
+    f"{os.getenv('DB_HOST', 'dpg-ctpism52ng1s73dsb7cg-a')}:" 
+    f"{os.getenv('DB_PORT', '5432')}/"
+    f"{os.getenv('DB_NAME', 'zadanie6_postgresql')}"
     )
 
 
