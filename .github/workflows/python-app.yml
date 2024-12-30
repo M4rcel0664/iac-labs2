@@ -30,7 +30,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry install
+              cd iac-labs2    # Przejdź do podfolderu, gdzie faktycznie jest pyproject.toml
+              poetry install
 
   static-tests:
     runs-on: ubuntu-latest
