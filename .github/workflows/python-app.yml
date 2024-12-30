@@ -1,4 +1,4 @@
-name: python-app  # Nazwa workflow
+name: python-app  # nazwa workflow
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
+
   build-deps:
     runs-on: ubuntu-latest
     concurrency:
@@ -15,20 +16,33 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v3
 
-      # Tu ustawiasz cache
+      # Krok diagnostyczny (opcjonalnie) - zobaczysz strukturę plików w logach
+      - name: List files
+        run: |
+          pwd
+          ls -R
+
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/work/iac-labs2/example-app/.venv
+          # Ścieżka do folderu z .venv -> w tym przykładzie "example-app/.venv"
+          path: example-app/.venv
           key: ${{ runner.os }}-venv
 
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH  # dodajemy Poetry do PATH
+          # Dodajemy Poetry do PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Configure Poetry to create venv in the project folder
+        working-directory: example-app
+        run: |
+          poetry config virtualenvs.in-project true
 
       - name: Install dependencies
+        working-directory: example-app
         run: |
           poetry install
 
@@ -36,33 +50,34 @@ jobs:
     runs-on: ubuntu-latest
     concurrency:
       group: static-tests-group
-    needs: build-deps
+    needs: build-deps  # job uruchomi się po zakończeniu build-deps
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
 
-      # Tak samo cache (może być ten sam "key", by przyspieszyć)
       - name: Cache build venv
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/work/iac-labs2/example-app/.venv
+          path: example-app/.venv
           key: ${{ runner.os }}-venv
 
-      - name: Use Poetry
+      - name: Add Poetry to PATH
         run: |
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Odpalenie lintera, formattera, security (przykład)
       - name: Lint
+        working-directory: example-app
         run: |
           poetry run flake8 .
 
       - name: Formatter
+        working-directory: example-app
         run: |
           poetry run black --check .
 
       - name: Security
+        working-directory: example-app
         run: |
           poetry run bandit -r .
 
@@ -70,8 +85,9 @@ jobs:
     runs-on: ubuntu-latest
     concurrency:
       group: unit-tests-group
-    # Jesli chcesz, zeby testy jednostkowe startowaly dopiero po static-tests:
-    needs: [build-deps, static-tests]
+    needs: 
+      - build-deps
+      - static-tests  # Jeśli chcesz, by testy jednostkowe czekały na static-tests
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
@@ -80,14 +96,14 @@ jobs:
         id: cached-poetry-dependencies
         uses: actions/cache@v3
         with:
-          path: /home/runner/work/iac-labs2/example-app/.venv
+          path: example-app/.venv
           key: ${{ runner.os }}-venv
 
-      - name: Use Poetry
+      - name: Add Poetry to PATH
         run: |
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Testy jednostkowe
-      - name: Run tests
+      - name: Tests
+        working-directory: example-app
         run: |
           poetry run pytest --verbose
